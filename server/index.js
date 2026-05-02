@@ -6,12 +6,13 @@ import cors from 'cors'; // разрешить запросы к серверу 
 import express from 'express'; // веб-сервер
 import jwt from 'jsonwebtoken'; // JWT авторизация
 import multer from 'multer'; // загрузка изображений
-import path from 'path'; // работа с путями фалов
+import path from 'path'; // работа с путями файлов
 /**
  * Импорт функций для работы с данными (файловая БД)
  */
 import {
 	createBoard,
+	createAutoNamedBoard,
 	createUserWithDataFolder,
 	deleteBoard,
 	findUserByName,
@@ -159,9 +160,19 @@ function validateBoard(body)
 		typeof body.name === 'string' && body.name.trim()
 			? body.name.trim().slice(0, 80)
 			: undefined
+
+	// Счетчики автонумерации внутри доски
+	const nextColumnNumber =
+		Number.isInteger(body.nextColumnNumber) && body.nextColumnNumber > 0
+			? body.nextColumnNumber
+			: undefined
+	const nextTaskNumber =
+		Number.isInteger(body.nextTaskNumber) && body.nextTaskNumber > 0
+			? body.nextTaskNumber
+			: undefined
 	
 	// Возвращает обработанную и проверенную структуру
-	return { columns, tasks, name }
+	return { columns, tasks, name, nextColumnNumber, nextTaskNumber }
 }
 
 
@@ -237,10 +248,10 @@ app.get('/api/boards', authMiddleware, (req, res) => {
 
 // Создание пустой доски
 app.post('/api/boards', authMiddleware, async (req, res) => {
-	const list = listBoards(req.userId)
 	const rawName = normalizeName(req.body?.name)
-	const name = rawName || `Доска ${list.length + 1}`
-	const full = await createBoard(req.userId, name)
+	const full = rawName
+		? await createBoard(req.userId, rawName)
+		: await createAutoNamedBoard(req.userId)
 	res.status(201).json({
 		board: {
 			id: full.id,
