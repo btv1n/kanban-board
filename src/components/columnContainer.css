@@ -1,0 +1,248 @@
+.column {
+	background: var(--color-column-bg);
+	width: 350px;
+	height: 500px;
+	max-height: 500px;
+	border-radius: 1rem;
+	display: flex;
+	flex-direction: column;
+	color: var(--color-text);
+}
+
+.column--placeholder {
+	opacity: 0.4;
+	border: 2px solid var(--color-accent);
+}
+
+.column__tasks .column__images {
+	flex-shrink: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.5rem;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	padding-bottom: 0.25rem;
+	margin-bottom: 0.25rem;
+	border-bottom: 1px solid rgba(22, 28, 34, 0.85);
+}
+
+.column__image-file-input {
+	position: absolute;
+	width: 0;
+	height: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.column__image-wrap {
+	position: relative;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	border-radius: 0.35rem;
+	overflow: hidden;
+	flex-shrink: 0;
+	background: var(--color-main-bg);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	max-height: 12rem;
+}
+
+.column__image-wrap--preview {
+	outline: 1px dashed var(--color-gray-500);
+}
+
+.column__image-wrap--placeholder {
+	opacity: 0.35;
+	border: 2px solid var(--color-accent);
+	min-width: 5rem;
+	min-height: 5rem;
+}
+
+.column__image-thumb {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	height: auto;
+	max-height: 12rem;
+	object-fit: contain;
+}
+
+.column__image-remove {
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 1.1rem;
+	height: 1.1rem;
+	padding: 0;
+	border: none;
+	border-radius: 0 0 0 0.2rem;
+	background: rgba(0, 0, 0, 0.65);
+	color: #fff;
+	font-size: 0.75rem;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.column__image-remove:hover {
+	background: var(--color-accent);
+}
+
+.column__image-skeleton {
+	width: 100%;
+	max-width: 100%;
+	min-height: 4rem;
+	max-height: 8rem;
+	border-radius: 0.35rem;
+	background: var(--color-main-bg);
+	color: var(--color-gray-500);
+	font-size: 0.65rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.column__image-error {
+	margin: 0;
+	width: 100%;
+	font-size: 0.7rem;
+	color: var(--color-accent);
+}
+
+.column__header {
+	background: var(--color-main-bg);
+	font-size: 1rem;
+	line-height: 1.5rem;
+	height: 60px;
+	cursor: grab;
+	border-radius: 1rem;
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+	padding: 0.75rem;
+	font-weight: 700;
+	border: 4px solid var(--color-column-bg);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.column__header-left {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+	flex: 1;
+}
+
+.column__title-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.column__badge {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background: var(--color-column-bg);
+	padding: 0.25rem 0.5rem;
+	font-size: 0.875rem;
+	line-height: 1.25rem;
+	border-radius: 9999px;
+	flex-shrink: 0;
+}
+
+.column__title-input {
+	background: #000;
+	border: 1px solid #374151;
+	border-radius: 0.25rem;
+	outline: none;
+	padding: 0 0.5rem;
+	color: var(--color-text);
+	font: inherit;
+	min-width: 0;
+	flex: 1;
+	width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.column__title-input:focus {
+	border-color: var(--color-accent);
+}
+
+.column__delete-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.25rem 0.5rem;
+	border: none;
+	border-radius: 0.25rem;
+	background: transparent;
+	color: var(--color-gray-500);
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.column__delete-btn:hover {
+	color: #ffffff;
+	background: var(--color-column-bg);
+}
+
+.column__delete-btn .icon {
+	stroke: currentColor;
+}
+
+.column__tasks {
+	display: flex;
+	flex-grow: 1;
+	flex-direction: column;
+	gap: 1rem;
+	padding: 0.5rem;
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.column__footer {
+	display: flex;
+	gap: 0.5rem;
+	align-items: stretch;
+	margin-top: auto;
+	flex-shrink: 0;
+	padding: 0 0.5rem 0.5rem;
+}
+
+.column__footer .column__add-task {
+	flex: 1;
+	min-width: 0;
+	justify-content: center;
+}
+
+.column__add-task {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	border: 2px solid var(--color-column-bg);
+	border-radius: 0.375rem;
+	padding: 1rem;
+	background: transparent;
+	color: var(--color-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.column__add-task:hover {
+	background: var(--color-main-bg);
+	color: var(--color-accent);
+}
+
+.column__add-task:active {
+	background: #000000;
+}
