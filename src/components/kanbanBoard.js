@@ -79,6 +79,70 @@ function columnIdContainingImage(cols, imageId)
 	return col ? col.id : null
 }
 
+// Названия колонок по умолчанию
+const DEFAULT_COLUMN_NAME_RE = /^Колонка\s+(\d+)$/
+
+// Названия задач по умолчанию
+const DEFAULT_TASK_NAME_RE = /^Задача\s+(\d+)$/
+
+// Определяет следующий доступный номер новой колонки
+function deriveNextColumnNumber(columns) 
+{
+	// Максимальный найденный номер колонки
+	let max = 0
+
+	// Перебираем все колонки
+	for (const column of columns) 
+	{
+		// Если колонка не существует или название не является строкой - пропускаем
+		if (!column || typeof column.title !== 'string') continue
+
+		// Проверяем, соответствует ли название колонки шаблону
+		const match = column.title.trim().match(DEFAULT_COLUMN_NAME_RE)
+
+		// Если название не соответствует шаблону - пропускаем
+		if (!match) continue
+
+		// Преобразуем название колонки в число и обновляем максимальный номер
+		const value = Number(match[1])
+
+		// Проверяем, что это корректное целое число и обновляем максимальный номер
+		if (Number.isInteger(value) && value > max) max = value
+	}
+
+	// Возвращаем следующий доступный номер новой колонки
+	return max + 1
+}
+
+
+// Определяет следующий доступный номер новой задачи
+function deriveNextTaskNumber(tasks) 
+{
+
+	// Максимальный найденный номер задачи
+	let max = 0
+
+	// Перебираем все задачи
+	for (const task of tasks) 
+	{
+		// Если задача не существует или содержимое не является строкой - пропускаем
+		if (!task || typeof task.content !== 'string') continue
+
+		// Проверяем, соответствует ли содержимое задачи шаблону
+		const match = task.content.trim().match(DEFAULT_TASK_NAME_RE)
+
+		// Если содержимое не соответствует шаблону - пропускаем
+		if (!match) continue
+
+		// Извлекаем номер задачи
+		const value = Number(match[1])
+
+		// Проверяем, что это корректное целое число и обновляем максимальный номер
+		if (Number.isInteger(value) && value > max) max = value
+	}
+	return max + 1
+}
+
 
 // Межколоночный перенос изображения
 function applyImageCrossColumnDrop(cols, active, over) 
@@ -199,6 +263,8 @@ function KanbanBoard({ authToken, boardId }) {
 
 	// Задачи
 	const [tasks, setTasks] = useState([])
+	const [nextColumnNumber, setNextColumnNumber] = useState(1)
+	const [nextTaskNumber, setNextTaskNumber] = useState(1)
 
 	// Активные элементы
 	const [activeColumn, setActiveColumn] = useState(null)
@@ -225,19 +291,39 @@ function KanbanBoard({ authToken, boardId }) {
 
 				// Если компонент уже удален - прекращаем выполнение
 				if (cancelled) return
-
-				// Нормализуем колонки
-				setColumns(
-					(Array.isArray(board.columns) ? board.columns : []).map(
-						normalizeColumnFromServer,
-					),
+				
+				// Получаем задачи и колонки
+				const boardTasks = Array.isArray(board.tasks) ? board.tasks : []
+				const boardColumns = (Array.isArray(board.columns) ? board.columns : []).map(
+					normalizeColumnFromServer,
 				)
-				setTasks(Array.isArray(board.tasks) ? board.tasks : [])
+				// Устанавливаем колонки
+				setColumns(boardColumns)
+
+				// Устанавливаем задачи
+				setTasks(boardTasks)
+
+				// Устанавливаем следующий номер колонки
+				setNextColumnNumber(
+					Number.isInteger(board.nextColumnNumber) && board.nextColumnNumber > 0
+						? board.nextColumnNumber
+						: deriveNextColumnNumber(boardColumns),
+				)
+
+				// Устанавливаем следующий номер задачи
+				setNextTaskNumber(
+					Number.isInteger(board.nextTaskNumber) && board.nextTaskNumber > 0
+						? board.nextTaskNumber
+						: deriveNextTaskNumber(boardTasks),
+				)
 			} catch {
+				// Если компонент уже удален - прекращаем выполнение
 				if (!cancelled) 
 				{
 					setColumns([])
 					setTasks([])
+					setNextColumnNumber(1)
+					setNextTaskNumber(1)
 				}
 			} finally {
 				// Данные загружены
@@ -253,10 +339,23 @@ function KanbanBoard({ authToken, boardId }) {
 	useEffect(() => {
 		if (!authToken || !boardId || !hydrated) return undefined
 		const timer = setTimeout(() => {
-			saveBoard(authToken, boardId, { columns, tasks }).catch(() => {})
+			saveBoard(authToken, boardId, {
+				columns,
+				tasks,
+				nextColumnNumber,
+				nextTaskNumber,
+			}).catch(() => {})
 		}, 600)
 		return () => clearTimeout(timer)
-	}, [authToken, boardId, hydrated, columns, tasks])
+	}, [
+		authToken,
+		boardId,
+		hydrated,
+		columns,
+		tasks,
+		nextColumnNumber,
+		nextTaskNumber,
+	])
 
 
 	// Настройки drag
@@ -274,11 +373,12 @@ function KanbanBoard({ authToken, boardId }) {
 	{
 		const columnToAdd = {
 			id: generateId(),
-			title: `Колонка ${columns.length + 1}`,
+			title: `Колонка ${nextColumnNumber}`,
 			images: [],
 		}
 
-		setColumns([...columns, columnToAdd])
+		setColumns((prev) => [...prev, columnToAdd])
+		setNextColumnNumber((prev) => prev + 1)
 	}
 
 
@@ -338,7 +438,12 @@ function KanbanBoard({ authToken, boardId }) {
 		if (!file || !hydrated) return
 
 		// Сохраняем текущее состояние доски на сервер
-		await saveBoard(authToken, boardId, { columns, tasks })
+		await saveBoard(authToken, boardId, {
+			columns,
+			tasks,
+			nextColumnNumber,
+			nextTaskNumber,
+		})
 
 		// Загружаем файл на сервер в конкретную колонку
 		const { image } = await uploadColumnImage(authToken, boardId, columnId, file)
@@ -355,11 +460,12 @@ function KanbanBoard({ authToken, boardId }) {
 		const newTask = {
 			id: generateId(),
 			columnId,
-			content: `Задача ${tasks.length + 1}`,
+			content: `Задача ${nextTaskNumber}`,
 		}
 
 		// Добавляем задачу в массив задач
-		setTasks([...tasks, newTask])
+		setTasks((prev) => [...prev, newTask])
+		setNextTaskNumber((prev) => prev + 1)
 	}
 
 	// Удаление задачи
