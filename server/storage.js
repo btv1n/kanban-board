@@ -93,6 +93,147 @@ function boardsIndexPath(userId)
 	return path.join(userDataDir(userId), 'boards-index.json')
 }
 
+// Названия досок по умолчанию
+const DEFAULT_BOARD_NAME_RE = /^Доска\s+(\d+)$/
+
+// Определяет максимальный номер доски по умолчанию
+function getHighestDefaultBoardNumber(boards) 
+{
+	// Максимальный найденный номер доски
+	let max = 0
+
+	// Перебираем все доски
+	for (const row of boards) 
+	{
+		// Если доска не существует или название не является строкой - пропускаем
+		if (!row || typeof row.name !== 'string') continue
+
+		// Проверяем, соответствует ли название доски шаблону
+		const match = row.name.trim().match(DEFAULT_BOARD_NAME_RE)
+
+		// Если название не соответствует шаблону - пропускаем
+		if (!match) continue
+
+		// Преобразуем название доски в число и обновляем максимальный номер
+		const value = Number(match[1])
+
+		// Проверяем, что это корректное целое число и обновляем максимальный номер
+		if (Number.isInteger(value) && value > max) max = value
+	}
+	return max
+}
+
+// Читает индекс досок пользователя
+function readBoardsIndex(userId) 
+{
+	try 
+	{
+		// Читаем файл индекс досок
+		const raw = fs.readFileSync(boardsIndexPath(userId), 'utf8')
+
+		// Преобразуем строку в json объект
+		const parsed = JSON.parse(raw)
+
+		// Получаем список досок
+		const boards = Array.isArray(parsed.boards) ? parsed.boards : []
+
+		// Получаем следующий номер доски по умолчанию
+		const fallbackNext = getHighestDefaultBoardNumber(boards) + 1
+
+		// Получаем следующий номер доски из файла
+		const fromFile = Number(parsed.nextBoardNumber)
+
+		// Получаем следующий номер доски
+		const nextBoardNumber =
+			Number.isInteger(fromFile) && fromFile > 0 ? fromFile : fallbackNext
+
+		// Возвращаем список досок и следующий номер доски
+		return { boards, nextBoardNumber }
+	} catch {
+		return { boards: [], nextBoardNumber: 1 }
+	}
+}
+
+// Записывает индекс досок пользователя
+function writeBoardsIndex(userId, boards, nextBoardNumber) 
+{
+	// Получаем следующий номер доски по умолчанию
+	const fallbackNext = getHighestDefaultBoardNumber(boards) + 1
+
+	// Получаем следующий номер доски
+	const safeNext =
+		Number.isInteger(nextBoardNumber) && nextBoardNumber > 0
+			? nextBoardNumber
+			: fallbackNext
+
+	// Записываем индекс досок в файл
+	fs.writeFileSync(
+		boardsIndexPath(userId),
+		JSON.stringify({ boards, nextBoardNumber: safeNext }, null, 2),
+		'utf8'
+	)
+}
+
+// Названия колонок по умолчанию
+const DEFAULT_COLUMN_NAME_RE = /^Колонка\s+(\d+)$/
+
+// Названия задач по умолчанию
+const DEFAULT_TASK_NAME_RE = /^Задача\s+(\d+)$/
+
+// Определяет максимальный номер колонки по умолчанию
+function getHighestColumnNumber(columns) 
+{
+	// Максимальный найденный номер колонки
+	let max = 0
+
+	// Перебираем все колонки
+	for (const column of columns) 
+	{
+		// Если колонка не существует или название не является строкой - пропускаем
+		if (!column || typeof column.title !== 'string') continue
+
+		// Проверяем, соответствует ли название колонки шаблону
+		const match = column.title.trim().match(DEFAULT_COLUMN_NAME_RE)
+
+		// Если название не соответствует шаблону - пропускаем
+		if (!match) continue
+
+		// Преобразуем название колонки в число и обновляем максимальный номер
+		const value = Number(match[1])
+
+		// Проверяем, что это корректное целое число и обновляем максимальный номер
+		if (Number.isInteger(value) && value > max) max = value
+	}
+	return max
+}
+
+// Определяет максимальный номер задачи по умолчанию
+function getHighestTaskNumber(tasks) 
+{
+	// Максимальный найденный номер задачи
+	let max = 0
+
+	// Перебираем все задачи
+	for (const task of tasks) 
+	{
+		// Если задача не существует или содержимое не является строкой - пропускаем
+		if (!task || typeof task.content !== 'string') continue
+
+		// Проверяем, соответствует ли содержимое задачи шаблону
+		const match = task.content.trim().match(DEFAULT_TASK_NAME_RE)
+
+		// Если содержимое не соответствует шаблону - пропускаем
+		if (!match) continue
+
+		// Извлекаем номер задачи
+		const value = Number(match[1])
+
+		// Проверяем, что это корректное целое число и обновляем максимальный номер
+		if (Number.isInteger(value) && value > max) max = value
+	}
+	return max
+}
+
 
 // json-файл конкретной доски
 function boardFilePath(userId, boardId) 
@@ -240,12 +381,22 @@ function ensureBoardsMigratedFromLegacy(userId)
 
 	// Имя доски по умолчанию
 	const name = 'Доска'
+	const nextColumnNumber = getHighestColumnNumber(columns) + 1
+	const nextTaskNumber = getHighestTaskNumber(tasks) + 1
 
 	// Создание папки для новых досок, если ее нет
 	fs.mkdirSync(boardsDir(userId), { recursive: true })
 
 	// Новая структура доски
-	const full = { id, name, columns, tasks, updatedAt: now }
+	const full = {
+		id,
+		name,
+		columns,
+		tasks,
+		updatedAt: now,
+		nextColumnNumber,
+		nextTaskNumber,
+	}
 
 	// Сохранение новой доски в отдельный файл
 	fs.writeFileSync(
@@ -258,7 +409,7 @@ function ensureBoardsMigratedFromLegacy(userId)
 	fs.writeFileSync(
 		idxPath,
 		JSON.stringify(
-			{ boards: [{ id, name, updatedAt: now }] },
+			{ boards: [{ id, name, updatedAt: now }], nextBoardNumber: 1 },
 			null,
 			2
 		),
@@ -368,25 +519,14 @@ export function listBoards(userId)
 {
 	ensureBoardsMigratedFromLegacy(userId)
 
-	try 
-	{
-		// Чтение файла с индексом досок
-		const raw = fs.readFileSync(boardsIndexPath(userId), 'utf8')
+	const { boards } = readBoardsIndex(userId)
 
-		const j = JSON.parse(raw)
-
-		// Получаем массив досок, если его нет - используем пустой массив
-		const boards = Array.isArray(j.boards) ? j.boards : []
-
-		// Возвращаем копию массива досок (сортировка по дате обновления - новые доски будут выше)
-		return [...boards].sort(
-			(a, b) =>
-				new Date(b.updatedAt || 0).getTime() -
-				new Date(a.updatedAt || 0).getTime()
-		)
-	} catch {
-		return []
-	}
+	// Возвращаем копию массива досок (сортировка по дате обновления - новые доски будут выше)
+	return [...boards].sort(
+		(a, b) =>
+			new Date(b.updatedAt || 0).getTime() -
+			new Date(a.updatedAt || 0).getTime()
+	)
 }
 
 
@@ -442,6 +582,14 @@ export function getFullBoard(userId, boardId)
 				typeof b.updatedAt === 'string'
 					? b.updatedAt
 					: new Date().toISOString(),
+			nextColumnNumber:
+				Number.isInteger(b.nextColumnNumber) && b.nextColumnNumber > 0
+					? b.nextColumnNumber
+					: getHighestColumnNumber(columns) + 1,
+			nextTaskNumber:
+				Number.isInteger(b.nextTaskNumber) && b.nextTaskNumber > 0
+					? b.nextTaskNumber
+					: getHighestTaskNumber(Array.isArray(b.tasks) ? b.tasks : []) + 1,
 		}
 	} catch {
 		return null
@@ -473,6 +621,14 @@ export function saveFullBoard(userId, boardId, data)
 			columns: data.columns,
 			tasks: data.tasks,
 			updatedAt: now,
+			nextColumnNumber:
+				Number.isInteger(data.nextColumnNumber) && data.nextColumnNumber > 0
+					? data.nextColumnNumber
+					: existing.nextColumnNumber,
+			nextTaskNumber:
+				Number.isInteger(data.nextTaskNumber) && data.nextTaskNumber > 0
+					? data.nextTaskNumber
+					: existing.nextTaskNumber,
 		}
 
 		// Создание папки досок, если ее нет
@@ -487,15 +643,7 @@ export function saveFullBoard(userId, boardId, data)
 
 
 		// Обновление индекса досок
-		let boards = []
-		try 
-		{
-			const idxRaw = fs.readFileSync(boardsIndexPath(userId), 'utf8')
-			const idx = JSON.parse(idxRaw)
-			boards = Array.isArray(idx.boards) ? idx.boards : []
-		} catch {
-			return false
-		}
+		const { boards, nextBoardNumber } = readBoardsIndex(userId)
 
 		// Нашли ли доску в индексе
 		let found = false
@@ -520,11 +668,7 @@ export function saveFullBoard(userId, boardId, data)
 		if (!found) next.push({ id: boardId, name, updatedAt: now })
 		
 		// Сохраняем обновленный индекс в файл
-		fs.writeFileSync(
-			boardsIndexPath(userId),
-			JSON.stringify({ boards: next }, null, 2),
-			'utf8'
-		)
+		writeBoardsIndex(userId, next, nextBoardNumber)
 
 		// Удаляем старые изображения, которые больше не используются в колонках
 		cleanupBoardMediaNotInColumns(userId, boardId, data.columns)
@@ -556,6 +700,8 @@ export function createBoard(userId, name)
 			columns: [],
 			tasks: [],
 			updatedAt: now,
+			nextColumnNumber: 1,
+			nextTaskNumber: 1,
 		}
 
 		// Создаём папку пользователя для досок
@@ -568,28 +714,47 @@ export function createBoard(userId, name)
 			'utf8'
 		)
 
-		let boards = []
-
-		try {
-			const idx = JSON.parse(
-				fs.readFileSync(boardsIndexPath(userId), 'utf8')
-			)
-
-			boards = Array.isArray(idx.boards) ? idx.boards : []
-
-		} catch {
-			boards = []
-		}
+		const { boards, nextBoardNumber } = readBoardsIndex(userId)
 
 		// Добавляем новую доску в список
 		boards.push({ id, name: boardName, updatedAt: now })
 
 		// Сохраняем обновленный индекс досок
+		writeBoardsIndex(userId, boards, nextBoardNumber)
+
+		return full
+	})
+}
+
+export function createAutoNamedBoard(userId) 
+{
+	return withLock(() => {
+		ensureBoardsMigratedFromLegacy(userId)
+
+		const id = crypto.randomUUID()
+		const now = new Date().toISOString()
+		const { boards, nextBoardNumber } = readBoardsIndex(userId)
+		const boardName = `Доска ${nextBoardNumber}`
+
+		const full = {
+			id,
+			name: boardName,
+			columns: [],
+			tasks: [],
+			updatedAt: now,
+			nextColumnNumber: 1,
+			nextTaskNumber: 1,
+		}
+
+		fs.mkdirSync(boardsDir(userId), { recursive: true })
 		fs.writeFileSync(
-			boardsIndexPath(userId),
-			JSON.stringify({ boards }, null, 2),
+			boardFilePath(userId, id),
+			JSON.stringify(full, null, 2),
 			'utf8'
 		)
+
+		boards.push({ id, name: boardName, updatedAt: now })
+		writeBoardsIndex(userId, boards, nextBoardNumber + 1)
 
 		return full
 	})
@@ -621,17 +786,7 @@ export function renameBoard(userId, boardId, name)
 			'utf8'
 		)
 
-		let boards = []
-
-		try 
-		{
-			const idx = JSON.parse(
-				fs.readFileSync(boardsIndexPath(userId), 'utf8')
-			)
-			boards = Array.isArray(idx.boards) ? idx.boards : []
-		} catch {
-			return { ok: false, code: 'not_found' }
-		}
+		const { boards, nextBoardNumber } = readBoardsIndex(userId)
 
 		// Создаем новый список досок с обновленным именем
 		const next = boards.map((row) =>
@@ -641,11 +796,7 @@ export function renameBoard(userId, boardId, name)
 		)
 
 		// Сохраняем обновленный индекс в файл
-		fs.writeFileSync(
-			boardsIndexPath(userId),
-			JSON.stringify({ boards: next }, null, 2),
-			'utf8'
-		)
+		writeBoardsIndex(userId, next, nextBoardNumber)
 		
 		return { ok: true, board: { id: boardId, name, updatedAt: now } }
 	})
@@ -668,16 +819,7 @@ export function deleteBoard(userId, boardId)
 		const file = boardFilePath(userId, boardId)
 		if (!fs.existsSync(file)) return { ok: false, code: 'not_found' }
 
-		let boards = []
-
-		try {
-			const idx = JSON.parse(
-				fs.readFileSync(boardsIndexPath(userId), 'utf8')
-			)
-			boards = Array.isArray(idx.boards) ? idx.boards : []
-		} catch {
-			return { ok: false, code: 'not_found' }
-		}
+		const { boards, nextBoardNumber } = readBoardsIndex(userId)
 
 		// Запрещаем удалять последнюю доску
 		if (boards.length <= 1)
@@ -708,11 +850,7 @@ export function deleteBoard(userId, boardId)
 		const next = boards.filter((b) => b.id !== boardId)
 
 		// Сохраняем обновленный индекс
-		fs.writeFileSync(
-			boardsIndexPath(userId),
-			JSON.stringify({ boards: next }, null, 2),
-			'utf8'
-		)
+		writeBoardsIndex(userId, next, nextBoardNumber)
 
 		return { ok: true }
 	})
@@ -787,6 +925,8 @@ export function createUserWithDataFolder(name)
 					columns: [],
 					tasks: [],
 					updatedAt: now,
+					nextColumnNumber: 1,
+					nextTaskNumber: 1,
 				},
 				null,
 				2
@@ -800,6 +940,7 @@ export function createUserWithDataFolder(name)
 			JSON.stringify(
 				{
 					boards: [{ id: boardId, name: boardName, updatedAt: now }],
+					nextBoardNumber: 2,
 				},
 				null,
 				2
